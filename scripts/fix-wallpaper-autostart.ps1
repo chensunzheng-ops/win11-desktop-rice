@@ -17,8 +17,12 @@ param([switch]$Remove)
 $ErrorActionPreference = 'Stop'
 $taskName = 'WallpaperEngine_Logon'
 
+$backupDir = Join-Path $PSScriptRoot '..\backup'
+$marker    = Join-Path $backupDir 'wallpaper-task-created.txt'
+
 if ($Remove) {
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+    Remove-Item $marker -ErrorAction SilentlyContinue
     Write-Host "已删除计划任务 $taskName"
     exit 0
 }
@@ -52,6 +56,12 @@ $trigger   = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 $trigger.Delay = 'PT10S'   # 等桌面加载完再启动，避免壁纸闪一下就没了
 $settings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit 0
 $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
+
+# 记下这个任务是不是本脚本新建的，一键还原时只删自己建的
+if (-not (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)) {
+    New-Item -ItemType Directory -Force $backupDir | Out-Null
+    Set-Content $marker 'created by fix-wallpaper-autostart.ps1'
+}
 
 Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger `
     -Settings $settings -Principal $principal -Force | Out-Null

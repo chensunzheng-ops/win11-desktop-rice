@@ -51,19 +51,24 @@ if ($Undo) {
     $rects[8] = [byte]$backup.TaskbarAutoHide
     Set-ItemProperty -Path $stuckRects -Name Settings -Value $rects
     Restart-Explorer
+    Remove-Item $backupFile
     Write-Host '已恢复原来的设置。'
     exit 0
 }
 
-# 先备份当前值
-New-Item -ItemType Directory -Force $backupDir | Out-Null
+# 先备份当前值；已经有备份就不覆盖，保证多次运行后还能还原到最初的样子
 $rects = (Get-ItemProperty $stuckRects).Settings
-$backup = @{
-    Items = @($settings | ForEach-Object { @{ Path = $_.Path; Name = $_.Name; Value = (Get-Value $_.Path $_.Name) } })
-    TaskbarAutoHide = $rects[8]
+if (Test-Path $backupFile) {
+    Write-Host "已有备份 $backupFile，保留不覆盖。"
+} else {
+    New-Item -ItemType Directory -Force $backupDir | Out-Null
+    $backup = @{
+        Items = @($settings | ForEach-Object { @{ Path = $_.Path; Name = $_.Name; Value = (Get-Value $_.Path $_.Name) } })
+        TaskbarAutoHide = $rects[8]
+    }
+    $backup | ConvertTo-Json -Depth 4 | Set-Content $backupFile -Encoding UTF8
+    Write-Host "当前设置已备份到 $backupFile"
 }
-$backup | ConvertTo-Json -Depth 4 | Set-Content $backupFile -Encoding UTF8
-Write-Host "当前设置已备份到 $backupFile"
 
 foreach ($s in $settings) {
     if (-not (Test-Path $s.Path)) { New-Item -Path $s.Path -Force | Out-Null }
