@@ -5,8 +5,6 @@
 
 ![效果预览](docs/preview.png)
 
-> 截图待补：把你的桌面截图命名为 `preview.png` 放进 `docs/` 文件夹。
-
 ---
 
 ## 用到的软件
