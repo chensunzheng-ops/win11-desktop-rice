@@ -1,0 +1,78 @@
+﻿<#
+  apply-look.ps1
+  一键应用桌面外观：深色任务栏、透明效果、自动隐藏任务栏、隐藏桌面图标、
+  隐藏"任务视图"按钮。
+
+  用法：
+    .\apply-look.ps1          应用设置（会先把当前设置备份到 backup\ 文件夹）
+    .\apply-look.ps1 -Undo    恢复成运行脚本之前的设置
+#>
+param([switch]$Undo)
+
+$ErrorActionPreference = 'Stop'
+$backupDir  = Join-Path $PSScriptRoot '..\backup'
+$backupFile = Join-Path $backupDir 'look-backup.json'
+
+$personalize = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+$advanced    = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+$stuckRects  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3'
+
+# 要修改的注册表项：路径、名称、目标值
+$settings = @(
+    @{ Path = $personalize; Name = 'SystemUsesLightTheme'; Value = 0 }  # 任务栏和开始菜单用深色
+    @{ Path = $personalize; Name = 'EnableTransparency';   Value = 1 }  # 打开透明效果
+    @{ Path = $advanced;    Name = 'HideIcons';            Value = 1 }  # 隐藏桌面图标
+    @{ Path = $advanced;    Name = 'ShowTaskViewButton';   Value = 0 }  # 隐藏"任务视图"按钮
+)
+
+function Get-Value($path, $name) {
+    $item = Get-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue
+    if ($item) { return $item.$name } else { return $null }
+}
+
+function Restart-Explorer {
+    Write-Host '正在重启资源管理器，任务栏会闪一下...'
+    Stop-Process -Name explorer -Force
+    Start-Sleep -Seconds 2
+    if (-not (Get-Process explorer -ErrorAction SilentlyContinue)) { Start-Process explorer }
+}
+
+if ($Undo) {
+    if (-not (Test-Path $backupFile)) { Write-Host '没有找到备份文件，无法恢复。'; exit 1 }
+    $backup = Get-Content $backupFile -Raw | ConvertFrom-Json
+    foreach ($s in $backup.Items) {
+        if ($null -eq $s.Value) {
+            Remove-ItemProperty -Path $s.Path -Name $s.Name -ErrorAction SilentlyContinue
+        } else {
+            Set-ItemProperty -Path $s.Path -Name $s.Name -Value $s.Value -Type DWord
+        }
+    }
+    $rects = (Get-ItemProperty $stuckRects).Settings
+    $rects[8] = [byte]$backup.TaskbarAutoHide
+    Set-ItemProperty -Path $stuckRects -Name Settings -Value $rects
+    Restart-Explorer
+    Write-Host '已恢复原来的设置。'
+    exit 0
+}
+
+# 先备份当前值
+New-Item -ItemType Directory -Force $backupDir | Out-Null
+$rects = (Get-ItemProperty $stuckRects).Settings
+$backup = @{
+    Items = @($settings | ForEach-Object { @{ Path = $_.Path; Name = $_.Name; Value = (Get-Value $_.Path $_.Name) } })
+    TaskbarAutoHide = $rects[8]
+}
+$backup | ConvertTo-Json -Depth 4 | Set-Content $backupFile -Encoding UTF8
+Write-Host "当前设置已备份到 $backupFile"
+
+foreach ($s in $settings) {
+    if (-not (Test-Path $s.Path)) { New-Item -Path $s.Path -Force | Out-Null }
+    Set-ItemProperty -Path $s.Path -Name $s.Name -Value $s.Value -Type DWord
+}
+
+# 自动隐藏任务栏：StuckRects3 的第 9 个字节，3 = 自动隐藏，2 = 常驻
+$rects[8] = 3
+Set-ItemProperty -Path $stuckRects -Name Settings -Value $rects
+
+Restart-Explorer
+Write-Host '外观设置完成。想恢复原样，运行：.\apply-look.ps1 -Undo'
