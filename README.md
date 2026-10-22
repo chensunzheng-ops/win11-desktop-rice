@@ -6,7 +6,7 @@
 <br>
 一个干净、会动的 Windows 11 桌面。装好两个软件，运行一个脚本，就能变得跟我的一模一样。
 
-![Windows 11](https://img.shields.io/badge/Windows-11-0078D4?style=flat-square&logo=windows11&logoColor=white)
+![Windows 11](https://img.shields.io/badge/Windows-11-0078D4?style=flat-square&logo=windows&logoColor=white)
 ![PowerShell](https://img.shields.io/badge/PowerShell-5.1-5391FE?style=flat-square&logo=powershell&logoColor=white)
 ![一键还原](https://img.shields.io/badge/一键还原-支持-2ea44f?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-lightgrey?style=flat-square)
